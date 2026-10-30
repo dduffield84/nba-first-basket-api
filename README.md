@@ -66,6 +66,12 @@ curl -X POST http://127.0.0.1:8000/first-basket/probabilities \
 
 ## Deploy on Render
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/dduffield84/nba-first-basket-api)
+
+The button uses `render.yaml`, which creates a free web service and has Render
+generate a random `NBA_API_KEY` for you (find it under the service's
+Environment tab). To set it up by hand instead:
+
 - Runtime: Python 3 (version taken from `.python-version`)
 - Build command: `pip install -r requirements.txt`
 - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`

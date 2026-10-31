@@ -89,7 +89,8 @@ def test_game_log_grouping():
 def test_build_record_flags():
     game = {"game_id": "002", "game_date": "2025-10-24",
             "home_team": "BOS", "away_team": "NYK"}
-    record, starters = importer.build_record(game, "2025-26", PBP, BOX)
+    record, starters = importer.build_record(
+        game, "2025-26", PBP, firstbasket.parse_starters(BOX))
     assert record["player_name"] == "Tatum"
     assert record["tip_winner_team"] == "BOS"
     assert record["verified"] == 0
@@ -129,12 +130,12 @@ def test_importer_end_to_end(tmp_path, monkeypatch):
              {"game_id": "002", "game_date": "2025-10-24",
               "home_team": "NYK", "away_team": "BOS"}]
     calls = []
-    monkeypatch.setattr(importer, "fetch_games", lambda *a: games)
 
     def fake_fetch(game_id, timeout):
         calls.append(game_id)
-        return PBP, BOX
-    monkeypatch.setattr(importer, "fetch_game", fake_fetch)
+        return PBP, firstbasket.parse_starters(BOX)
+    monkeypatch.setitem(importer.FETCHERS, "stats",
+                        (lambda *a: games, fake_fetch))
 
     assert importer.main(["--season", "2025-26", "--delay", "0"]) == 0
     rows = db.read_csv(db.FIRST_BASKETS_CSV)
@@ -154,14 +155,100 @@ def test_importer_stops_when_blocked(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "STARTERS_CSV", tmp_path / "st.csv")
     games = [{"game_id": f"00{i}", "game_date": "2025-10-22"}
              for i in range(9)]
-    monkeypatch.setattr(importer, "fetch_games", lambda *a: games)
+    monkeypatch.setitem(importer.FETCHERS, "stats",
+                        (lambda *a: games, None))
     calls = []
 
     def blocked(game_id, timeout):
         calls.append(game_id)
         raise ConnectionError("blocked")
-    monkeypatch.setattr(importer, "fetch_game", blocked)
+    monkeypatch.setitem(importer.FETCHERS, "stats",
+                        (lambda *a: games, blocked))
     monkeypatch.setattr(importer.time, "sleep", lambda s: None)
-    assert importer.main(["--delay", "0",
+    assert importer.main(["--delay", "0", "--source", "stats",
                           "--max-consecutive-failures", "2"]) == 1
     assert len(calls) == 2 * 3  # two games, three attempts each
+
+
+CDN_PBP = [
+    {"actionNumber": 4, "period": 1, "actionType": "jumpball",
+     "isFieldGoal": 0, "personId": 1629684, "teamTricode": "BOS",
+     "jumpBallRecoverdPersonId": 1629684,
+     "description": "Jump Ball T. Thompson vs. N. Vucevic: Tip to G. Williams"},
+    {"actionNumber": 7, "period": 1, "actionType": "freethrow",
+     "isFieldGoal": 0, "shotResult": "Made", "personId": 202696,
+     "teamTricode": "ORL", "description": "N. Vucevic Free Throw 1 of 1"},
+    {"actionNumber": 9, "period": 1, "actionType": "3pt", "isFieldGoal": 1,
+     "shotResult": "Made", "personId": 1627759, "playerName": "Brown",
+     "playerNameI": "J. Brown", "teamTricode": "BOS"},
+]
+
+CDN_BOX = {
+    "homeTeam": {"teamTricode": "BOS", "players": [
+        {"personId": 1627759, "name": "Jaylen Brown", "starter": "1"},
+        {"personId": 1629684, "name": "Grant Williams", "starter": "1"},
+        {"personId": 1, "name": "Bench Guy", "starter": "0"}]},
+    "awayTeam": {"teamTricode": "ORL", "players": [
+        {"personId": 202696, "name": "Nikola Vucevic", "starter": "1"}]},
+}
+
+
+def test_cdn_feed_parsing():
+    first = firstbasket.parse_first_basket(CDN_PBP)
+    assert first["player_id"] == "1627759" and first["team"] == "BOS"
+    assert first["tip_to_id"] == "1629684"
+    assert first["flags"] == ["free_throw_scored_before_first_fg"]
+    starters = firstbasket.parse_live_starters(CDN_BOX)
+    assert [s["player_id"] for s in starters] == [
+        "1627759", "1629684", "202696"]
+    assert starters[2]["team"] == "ORL"
+    assert firstbasket.match_tip_winner(
+        first["tip_to"], starters, first["tip_to_id"]) == "BOS"
+    # Without the id, "G. Williams" still matches by surname.
+    assert firstbasket.match_tip_winner("G. Williams", starters) == "BOS"
+
+
+def test_surname_match_must_be_unambiguous():
+    starters = [
+        {"player_id": "1", "player_name": "Jalen Williams", "team": "OKC"},
+        {"player_id": "2", "player_name": "Grant Williams", "team": "CHA"},
+    ]
+    assert firstbasket.match_tip_winner("G. Williams", starters) is None
+
+
+def test_cdn_schedule():
+    season, games = firstbasket.parse_cdn_schedule({"leagueSchedule": {
+        "seasonYear": "2026-27", "gameDates": [{"games": [
+            {"gameId": "0022600002", "gameStatus": 3,
+             "gameDateEst": "2026-10-21T00:00:00Z",
+             "homeTeam": {"teamTricode": "LAL"},
+             "awayTeam": {"teamTricode": "GSW"}},
+            {"gameId": "0022600003", "gameStatus": 1,
+             "gameDateEst": "2026-11-01T00:00:00Z"},
+            {"gameId": "0012600001", "gameStatus": 3,
+             "gameDateEst": "2026-10-05T00:00:00Z"},
+        ]}]}})
+    assert season == "2026-27"
+    assert games == [{"game_id": "0022600002", "game_date": "2026-10-21",
+                      "home_team": "LAL", "away_team": "GSW"}]
+
+
+def test_auto_falls_back_to_cdn(tmp_path, monkeypatch):
+    import db
+    monkeypatch.setattr(db, "FIRST_BASKETS_CSV", tmp_path / "fb.csv")
+    monkeypatch.setattr(db, "STARTERS_CSV", tmp_path / "st.csv")
+    monkeypatch.setattr(importer.time, "sleep", lambda s: None)
+
+    def blocked(*a):
+        raise TimeoutError("stats.nba.com timed out")
+    games = [{"game_id": "0022600002", "game_date": "2026-10-21",
+              "home_team": "BOS", "away_team": "ORL"}]
+    monkeypatch.setitem(importer.FETCHERS, "stats", (blocked, blocked))
+    monkeypatch.setitem(importer.FETCHERS, "cdn", (
+        lambda *a: games,
+        lambda gid, t: (CDN_PBP, firstbasket.parse_live_starters(CDN_BOX))))
+    assert importer.main(["--season", "2026-27", "--delay", "0"]) == 0
+    rows = db.read_csv(db.FIRST_BASKETS_CSV)
+    assert rows[0]["player_id"] == "1627759"
+    assert rows[0]["source"].startswith("cdn.nba.com")
+    assert rows[0]["tip_winner_team"] == "BOS"

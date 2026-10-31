@@ -127,11 +127,14 @@ def build_record(game, season, pbp_rows, starters, source="stats"):
     if starters and first["player_id"] not in {
             s["player_id"] for s in starters}:
         flags.append("first_scorer_not_a_starter")
+    # The CDN play-by-play gives only surnames; prefer the box score name.
+    full_names = {s["player_id"]: s["player_name"] for s in starters}
     record = {
         "game_id": game["game_id"],
         "game_date": game["game_date"],
         "player_id": first["player_id"],
-        "player_name": first["player_name"],
+        "player_name": full_names.get(first["player_id"])
+        or first["player_name"],
         "team": first["team"],
         "source": SOURCES[source],
         # Feed data is not independently verified; see README.

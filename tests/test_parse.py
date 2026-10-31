@@ -91,7 +91,7 @@ def test_build_record_flags():
             "home_team": "BOS", "away_team": "NYK"}
     record, starters = importer.build_record(
         game, "2025-26", PBP, firstbasket.parse_starters(BOX))
-    assert record["player_name"] == "Tatum"
+    assert record["player_name"] == "Jayson Tatum"
     assert record["tip_winner_team"] == "BOS"
     assert record["verified"] == 0
     assert record["data_flags"] == "found_3_starters"
@@ -250,5 +250,6 @@ def test_auto_falls_back_to_cdn(tmp_path, monkeypatch):
     assert importer.main(["--season", "2026-27", "--delay", "0"]) == 0
     rows = db.read_csv(db.FIRST_BASKETS_CSV)
     assert rows[0]["player_id"] == "1627759"
+    assert rows[0]["player_name"] == "Jaylen Brown"
     assert rows[0]["source"].startswith("cdn.nba.com")
     assert rows[0]["tip_winner_team"] == "BOS"

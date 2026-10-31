@@ -85,10 +85,13 @@ def fetch_game(game_id, timeout):
 
 
 def fetch_cdn_games(season, season_type, timeout):
+    import requests
     from nba_api.live.nba.library.http import NBALiveHTTP
-    req = urllib.request.Request(CDN_SCHEDULE_URL, headers=NBALiveHTTP.headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        schedule = json.load(resp)
+    # requests handles the gzip encoding these headers ask for.
+    resp = requests.get(CDN_SCHEDULE_URL, headers=NBALiveHTTP.headers,
+                        timeout=timeout)
+    resp.raise_for_status()
+    schedule = resp.json()
     cdn_season, games = firstbasket.parse_cdn_schedule(schedule, season_type)
     if cdn_season and cdn_season != season:
         raise RuntimeError(

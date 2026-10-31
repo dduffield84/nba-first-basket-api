@@ -1,0 +1,52 @@
+name: Import first baskets
+
+on:
+  schedule:
+    - cron: "0 12 * * *"  # daily, after the previous night's games
+  workflow_dispatch:
+    inputs:
+      season:
+        description: "Season, e.g. 2025-26 (blank = current)"
+        required: false
+      max_games:
+        description: "Most games to import in this run"
+        required: false
+        default: "300"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-first-baskets
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Import from NBA.com
+        env:
+          SEASON: ${{ inputs.season }}
+          MAX_GAMES: ${{ inputs.max_games || '300' }}
+        run: |
+          args="--max-games $MAX_GAMES"
+          if [ -n "$SEASON" ]; then args="$args --season $SEASON"; fi
+          python scripts/import_first_baskets.py $args
+      - name: Commit new data
+        run: |
+          if git diff --quiet -- data/; then
+            echo "No new games."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/first_baskets.csv data/game_starters.csv
+          git commit -m "Import first-basket data"
+          git push

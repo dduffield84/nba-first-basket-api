@@ -4,7 +4,7 @@ import { ShieldCheck } from 'lucide-react';
 
 export const metadata = {
   title: 'Edge Intelligence AI | Sports Analytics',
-  description: 'Independent NBA, NFL and college football analytics with a public, paper-only model record.',
+  description: 'Independent NBA, NHL, NFL, college football and college basketball analytics with a public, paper-only model record.',
 };
 
 export const viewport = { width: 'device-width', initialScale: 1, themeColor: '#070b10' };

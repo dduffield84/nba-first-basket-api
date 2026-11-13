@@ -29,7 +29,15 @@ type Perf = {
   access: { tier: string; locked: string[] };
 };
 
-const SPORTS = ['', 'nba', 'nfl', 'cfb'];
+// sport keys as the Edge ledger records them; cbb = college basketball (men's and women's D1)
+const SPORTS = ['', 'nba', 'nhl', 'nfl', 'cfb', 'cbb'];
+
+// Some importers (college basketball) already put the line in the selection ("Akron -12"); don't repeat it.
+function pick(selection: string, line: number | null): string {
+  if (line === null) return selection;
+  const tail = selection.trim().split(' ').pop()?.replace(/^\+/, '');
+  return tail !== undefined && Number(tail) === line ? selection : selection + ' ' + line;
+}
 
 function todayET(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
@@ -120,7 +128,7 @@ export default async function Dashboard({ searchParams }: {
             <tbody>{board.data.items.map(i => (
               <tr key={i.entry_key}>
                 <td>{i.event_label}<div className="locked">{i.sport.toUpperCase()} · {i.market} · {when(i.event_start_utc)}</div></td>
-                <td>{i.selection}{i.line !== null ? ' ' + i.line : ''}</td>
+                <td>{pick(i.selection, i.line)}</td>
                 <td className="num">{pct(i.model_prob)}</td>
                 <td className="num">{pro ? american(i.fair_odds) : <span className="locked">PRO</span>}</td>
                 <td className="num">{american(i.odds_american)}</td>

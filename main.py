@@ -11,10 +11,12 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 import db
+import ledger_api
+import ledger_db  # noqa: F401  (registers the ledger tables)
 import model
 import relay
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 API_KEY = os.getenv("NBA_API_KEY", "")
 # Optional second key for apps that only read the board (it cannot write).
 READ_KEY = os.getenv("NBA_READ_KEY", "")
@@ -41,6 +43,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(GZipMiddleware, minimum_size=2000)
+ledger_api.get_engine = lambda: engine
 
 
 def utc_now():
@@ -745,3 +748,13 @@ def board(
         "first_basket_rule": "first made field goal",
         "games": out,
     }
+
+
+# ---------------------------------------------------------------------------
+# Edge Intelligence shared ledger (NFL, NBA, CFB)
+# ---------------------------------------------------------------------------
+
+app.include_router(ledger_api.write_router,
+                   dependencies=[Depends(require_api_key)])
+app.include_router(ledger_api.read_router,
+                   dependencies=[Depends(require_read_key)])

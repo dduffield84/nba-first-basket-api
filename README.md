@@ -2,7 +2,7 @@
 
 Private FastAPI service for NBA first-basket research: historical first
 scorers and starters imported from NBA.com, matchup probabilities from that
-history, and a prediction ledger graded against actual results. Version 1.2.0.
+history, and a prediction ledger graded against actual results. Version 1.3.0.
 
 The probabilities are a research baseline, not a trained or calibrated model.
 Do not treat their output as betting probabilities.
@@ -25,6 +25,25 @@ Imported records are stored with `verified: false` and a `data_flags` list
 
 "First basket" here means the first made field goal. A free throw scored
 earlier is flagged, not counted, because sportsbooks differ on this rule.
+
+## Edge Intelligence shared ledger (NFL, NBA, CFB)
+
+Version 1.3.0 adds one append-only ledger for every sport's predictions,
+paper bets and real bets, under `/ledger/*`. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the rules, tables and
+importers. In short: rows can't be edited or deleted (database triggers),
+only pregame rows count, the three kinds are reported separately, and a
+paper bet is staked only on an explicit BET with a price.
+
+Importers (read-only on the source; `--dry-run` sends nothing):
+
+```
+python scripts/ledger/from_nba_v7.py <NBA_Complete_V7 folder> --dry-run
+python scripts/ledger/from_nfl_paper.py "out/NFL_Week*_paper_bets_*.json" --kickoffs kickoffs.json --dry-run
+python scripts/ledger/from_csv.py cfb_export.csv --dry-run
+```
+
+To send, set `EDGE_LEDGER_URL` and `NBA_API_KEY` in the environment.
 
 ## Run locally
 

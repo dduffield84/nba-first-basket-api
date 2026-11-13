@@ -1,0 +1,62 @@
+name: Database backup
+
+# Daily encrypted backup of the live database, with a restore test.
+# Needs two repository secrets (Settings > Secrets and variables > Actions):
+#   BACKUP_DATABASE_URL  the database's external connection string
+#   BACKUP_PASSPHRASE    a long random passphrase; keep a copy somewhere safe
+# Without them the run only prints a notice. The repo is public, so the
+# dump is encrypted before upload; only the row-count/checksum file is plain.
+# To restore: download the artifact, then
+#   gpg --decrypt backup.dump.gpg > backup.dump
+#   pg_restore --no-owner --no-privileges -d "$NEW_DATABASE_URL" backup.dump
+
+on:
+  schedule:
+    - cron: "30 9 * * *"   # daily, before the import job
+  workflow_dispatch:
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DB_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check secrets
+        id: check
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "::notice::BACKUP_DATABASE_URL or BACKUP_PASSPHRASE not set; no backup taken."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+      - name: Matching Postgres client and scratch server
+        if: steps.check.outputs.ready == 'true'
+        run: scripts/db/ci_setup.sh "$DB_URL"
+      - name: Back up and test the restore
+        if: steps.check.outputs.ready == 'true'
+        run: scripts/db/backup.sh "$DB_URL" "$SCRATCH_URL" out
+      - name: Encrypt
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o out/backup.dump.gpg \
+            out/backup.dump <<< "$PASSPHRASE"
+          rm out/backup.dump
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: |
+            out/backup.dump.gpg
+            out/restored.fingerprint
+          retention-days: 30

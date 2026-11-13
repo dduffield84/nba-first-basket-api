@@ -1,0 +1,33 @@
+name: Database script tests
+
+on:
+  pull_request:
+    paths: ["scripts/db/**", "tests/db/**", ".github/workflows/db-*.yml"]
+  push:
+    branches: [main]
+    paths: ["scripts/db/**", "tests/db/**", ".github/workflows/db-*.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        postgres: ["16", "17"]   # Render runs 16; Supabase runs 17
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Postgres client ${{ matrix.postgres }}
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-client-${{ matrix.postgres }} >/dev/null
+          echo "/usr/lib/postgresql/${{ matrix.postgres }}/bin" >> "$GITHUB_PATH"
+      - name: Backup, migrate and verify (synthetic data)
+        run: tests/db/run.sh postgresql://postgres:postgres@localhost:5432

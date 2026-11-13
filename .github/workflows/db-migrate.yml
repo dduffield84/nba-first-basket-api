@@ -1,0 +1,66 @@
+name: Database migration
+
+# One-off copy of the live database to a new one, verified table by table.
+# Run by hand only (Actions > Database migration > Run workflow) and type
+# MIGRATE to confirm. The source is only read; nothing is deleted anywhere.
+# Needs repository secrets:
+#   SOURCE_DATABASE_URL  current database (Render external connection string)
+#   TARGET_DATABASE_URL  new, empty database (e.g. Supabase session pooler)
+#   BACKUP_PASSPHRASE    encrypts the dump kept as an artifact
+# Pass = every table's row count and checksum in the target equals the dump.
+# The live service is NOT switched over here; that is a separate step.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type MIGRATE to copy the source database into the target"
+        required: true
+
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: inputs.confirm == 'MIGRATE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SRC: ${{ secrets.SOURCE_DATABASE_URL }}
+      DST: ${{ secrets.TARGET_DATABASE_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check secrets
+        run: |
+          missing=""
+          [ -n "$SRC" ] || missing="$missing SOURCE_DATABASE_URL"
+          [ -n "$DST" ] || missing="$missing TARGET_DATABASE_URL"
+          [ -n "$PASSPHRASE" ] || missing="$missing BACKUP_PASSPHRASE"
+          if [ -n "$missing" ]; then echo "::error::Missing secrets:$missing"; exit 1; fi
+      - uses: actions/checkout@v4
+      - name: Matching Postgres client and scratch server
+        run: |
+          # The client must be at least as new as the newer of the two servers.
+          s=$(psql "$SRC" -XAtq -c "show server_version_num")
+          d=$(psql "$DST" -XAtq -c "show server_version_num")
+          if [ "$s" -ge "$d" ]; then scripts/db/ci_setup.sh "$SRC"; else scripts/db/ci_setup.sh "$DST"; fi
+      - name: Migrate and verify
+        run: scripts/db/migrate.sh "$SRC" "$DST" "$SCRATCH_URL" out
+      - name: Encrypt the dump
+        if: always()
+        run: |
+          if [ -f out/source.dump ]; then
+            gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+              --symmetric --cipher-algo AES256 -o out/source.dump.gpg \
+              out/source.dump <<< "$PASSPHRASE"
+            rm out/source.dump
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: db-migration-${{ github.run_id }}
+          path: |
+            out/source.dump.gpg
+            out/*.fingerprint
+          retention-days: 90

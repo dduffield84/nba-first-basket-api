@@ -27,8 +27,8 @@ Everything shown is the paper-only ledger: model predictions and paper bets, nev
 Copy `.env.example` to `.env.local`:
 
 ```
-EDGE_API_URL=https://YOUR-EDGE-SERVICE.onrender.com
-NEXT_PUBLIC_EDGE_API_URL=https://YOUR-EDGE-SERVICE.onrender.com
+EDGE_API_URL=https://edge-intelligence.onrender.com
+NEXT_PUBLIC_EDGE_API_URL=https://edge-intelligence.onrender.com
 ```
 
 On the Edge API service, set `EDGE_APP_ORIGINS` to this website's address (for example `https://edgeintelligence.example`) so the browser may call `/auth/*`. There are no keys in this site.
@@ -57,4 +57,4 @@ EDGE_WRITE_KEY=<throwaway> node tests/e2e.js
 
 - Payments. Adding Stripe later means a server-only webhook that calls Edge `/admin/users/tier` with the write key; Edge stays the source of truth for tiers.
 - Password reset, account deletion, terms and privacy pages, and a legal review.
-- Hosting. The site has not been deployed anywhere.
+- Hosting. Ready for Vercel (`vercel.json`, CI in `.github/workflows/web.yml`) against the Render API; see [docs/DEPLOY_WEBSITE.md](../docs/DEPLOY_WEBSITE.md). Not deployed yet.

@@ -1,0 +1,47 @@
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/web.yml"]
+  pull_request:
+    paths: ["web/**", ".github/workflows/web.yml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Same values the Vercel project uses. VERCEL=1 runs the build-time
+      # check in next.config.mjs, so a missing address fails here too.
+      VERCEL: "1"
+      EDGE_API_URL: https://edge-intelligence.onrender.com
+      NEXT_PUBLIC_EDGE_API_URL: https://edge-intelligence.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Build refuses a missing Edge address
+        run: |
+          if NEXT_PUBLIC_EDGE_API_URL= npm run build > /tmp/nobuild.log 2>&1; then
+            echo "Build passed without NEXT_PUBLIC_EDGE_API_URL; the check is not working."
+            exit 1
+          fi
+          grep -q "NEXT_PUBLIC_EDGE_API_URL must be set" /tmp/nobuild.log
+      - name: Edge address is in the page security policy
+        run: |
+          npm run build > /dev/null
+          (npx next start -p 3100 > /tmp/start.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:3100/responsible && break; sleep 1; done
+          curl -sI http://127.0.0.1:3100/responsible | tee /tmp/headers.txt
+          grep -i "content-security-policy" /tmp/headers.txt | grep -q "connect-src 'self' https://edge-intelligence.onrender.com"
+          grep -qi "x-frame-options: DENY" /tmp/headers.txt

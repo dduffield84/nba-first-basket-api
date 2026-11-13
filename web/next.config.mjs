@@ -3,6 +3,19 @@
 const edge = (process.env.NEXT_PUBLIC_EDGE_API_URL || '').replace(/\/+$/, '');
 const dev = process.env.NODE_ENV !== 'production';
 
+// On Vercel, stop the build when the Edge address is missing or not https.
+// NEXT_PUBLIC_ values are baked in at build time, so a site built without it
+// would deploy with sign-in silently broken.
+if (process.env.VERCEL === '1') {
+  for (const name of ['EDGE_API_URL', 'NEXT_PUBLIC_EDGE_API_URL']) {
+    const v = (process.env[name] || '').trim();
+    if (!/^https:\/\/[^/\s]+/.test(v)) {
+      throw new Error(name + ' must be set to the Edge API address (https://...) '
+        + 'in the Vercel project settings before building. See docs/DEPLOY_WEBSITE.md.');
+    }
+  }
+}
+
 const csp = [
   "default-src 'self'",
   // Next.js needs inline scripts for hydration; eval only in development.

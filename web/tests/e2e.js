@@ -32,7 +32,7 @@ async function setTier(email, tier) {
 
   await page.goto(SITE + '/pricing');
   await page.screenshot({ path: OUT + '02_pricing.png', fullPage: true });
-  check('pricing reads prices from Edge', (await page.content()).includes('$14.99'));
+  check('pricing reads prices from Edge', (await page.content()).includes('$19.99'));
   check('paid plans cannot be bought', await page.getByRole('button', { name: 'Opens after the beta' }).first().isDisabled());
 
   // sign up

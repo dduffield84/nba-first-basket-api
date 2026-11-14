@@ -33,7 +33,7 @@ function LoginForm() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body) });
       } catch {
-        throw Error('Could not reach Edge. The server may be waking up; try again in a minute.');
+        throw Error('Could not reach the Sanchez Sports Lab server. It may be waking up; try again in a minute.');
       }
       const data = await r.json().catch(() => null);
       if (r.status === 429) {
@@ -64,7 +64,7 @@ function LoginForm() {
   const signup = mode === 'signup';
   return (
     <main className="authbox card">
-      <div className="eyebrow">EDGE MEMBER ACCESS</div>
+      <div className="eyebrow">SANCHEZ SPORTS LAB MEMBER ACCESS</div>
       <h1>{signup ? 'Create your account' : 'Welcome back'}</h1>
       <p className="muted">
         {signup ? 'Free to start. 21+ only. Analytics and a paper record, never real wagers.'
@@ -84,7 +84,7 @@ function LoginForm() {
             <span>I am 21 or older.</span></label>
           <label className="check"><input type="checkbox" checked={terms}
             onChange={e => setTerms(e.target.checked)} required />
-            <span>I accept the terms. Edge is sports analytics only: it takes no bets,
+            <span>I accept the terms. Sanchez Sports Lab is sports analytics only: it takes no bets,
               holds no money and guarantees no results.</span></label>
         </>}
         <button className="btn" style={{ width: '100%' }} disabled={busy}>

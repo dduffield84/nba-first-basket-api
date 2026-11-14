@@ -6,13 +6,13 @@ const features = [
   { icon: Target, title: 'Probability first', desc: 'Every pick shows the model probability; members also see fair odds, the market price and expected value.' },
   { icon: Clock, title: 'Timestamped before the game', desc: 'A pick only counts as verified when our server received it before the start, on its own schedule.' },
   { icon: ChartColumnIncreasing, title: 'Losses stay on the record', desc: 'Results are append-only. Hit rate, Brier score and calibration are worked out from every settled pick.' },
-  { icon: ShieldCheck, title: 'Paper only', desc: 'The record is model predictions and paper bets. Edge takes no wagers and holds no money.' },
+  { icon: ShieldCheck, title: 'Paper only', desc: 'The record is model predictions and paper bets. Sanchez Sports Lab takes no wagers and holds no money.' },
   { icon: LockKeyhole, title: 'Free, Pro and Elite', desc: 'Free shows three games a day. Pro and Elite add value, every game and deeper breakdowns.' },
 ];
 
 const steps = [
   ['1', 'Model runs before the game', 'Each engine publishes its probability and decision (BET or PASS).'],
-  ['2', 'Server stamps it', 'Edge records when it arrived and checks it against the official start time.'],
+  ['2', 'Server stamps it', 'Our server records when it arrived and checks it against the official start time.'],
   ['3', 'Result is graded', 'Wins, losses and closing prices are added; nothing is edited or deleted.'],
 ];
 
@@ -20,7 +20,7 @@ export default function Home() {
   return <>
     <main className="hero">
       <div>
-        <div className="eyebrow">INDEPENDENT SPORTS ANALYTICS</div>
+        <div className="eyebrow">SANCHEZ SPORTS LAB · WHERE DATA MEETS THE GAME.</div>
         <h1>See beyond<br />the <em>odds.</em></h1>
         <p className="lead">Model probabilities for the NBA, NHL, NFL, college football and college basketball, set against the market, with a public paper record that keeps every loss.</p>
         <div className="actions">
@@ -56,7 +56,7 @@ export default function Home() {
     <section className="section">
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 25, flexWrap: 'wrap' }}>
         <div>
-          <div className="eyebrow">YOUR EDGE STARTS HERE</div>
+          <div className="eyebrow">WHERE DATA MEETS THE GAME.</div>
           <h2>One platform. Every insight.</h2>
           <p className="muted">Create a free account and see three games a day.</p>
         </div>

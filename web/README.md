@@ -1,4 +1,4 @@
-# Edge Intelligence website
+# Sanchez Sports Lab website (formerly Edge Intelligence)
 
 The public website and member dashboard for Edge Intelligence, built with Next.js. It began as a starter with its own Supabase sign-in, Stripe checkout and sample predictions. In this version the Edge API is the only backend:
 

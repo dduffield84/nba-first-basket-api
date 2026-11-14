@@ -104,7 +104,7 @@ export default async function Dashboard({ searchParams }: {
   return (
     <main className="dashboard">
       <div className="eyebrow">MEMBER TERMINAL · {tierName}</div>
-      <h1>Edge <span className="green">Board</span></h1>
+      <h1>Lab <span className="green">Board</span></h1>
       <div className="notice">Paper record only. These are model predictions and paper bets, never real wagers. Nothing here is a guarantee.</div>
 
       <div className="row" style={{ margin: '18px 0' }}>

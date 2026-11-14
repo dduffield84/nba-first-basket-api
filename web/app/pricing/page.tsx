@@ -15,7 +15,7 @@ export default async function Pricing() {
       <div className="eyebrow" style={{ textAlign: 'center' }}>MEMBERSHIP</div>
       <h1>Choose your <span className="green">edge.</span></h1>
       <p className="muted" style={{ textAlign: 'center', marginBottom: 30 }}>
-        Payments are not open yet. During the private beta, Pro and Elite are assigned by the Edge team.
+        Payments are not open yet. During the private beta, Pro and Elite are assigned by the Sanchez Sports Lab team.
       </p>
       {!r.ok ? <div className="warn">Plans could not be loaded: {r.detail}</div> : (
         <div className="pricegrid">

@@ -1,0 +1,114 @@
+name: SSL old Render archive - MANUAL ONLY
+
+on:
+  workflow_dispatch:
+    inputs:
+      approval:
+        description: "Type EXPORT-OLD-RENDER-READ-ONLY to approve read-only export and snapshot scans"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ssl-old-render-archive-manual
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    if: github.event.inputs.approval == 'EXPORT-OLD-RENDER-READ-ONLY'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    services:
+      scratch:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local-disposable-restore-only
+          POSTGRES_DB: ssl_render_restore
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ssl_render_restore"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, resolved during preparation
+        with:
+          persist-credentials: false
+      - name: Prepare only backup tools - never install or start the application
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16 gnupg python3-venv
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+          python3 -m venv "$RUNNER_TEMP/ssl-backup-venv"
+          "$RUNNER_TEMP/ssl-backup-venv/bin/pip" install \
+            'psycopg[binary]==3.3.9'
+          echo "$RUNNER_TEMP/ssl-backup-venv/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\.'
+      - name: Show this runner's temporary outbound IPv4
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --ipv4 --max-time 20 \
+            https://api.ipify.org > "$RUNNER_TEMP/ssl-outbound-ip"
+          python3 - <<'PY'
+          import ipaddress, os
+          from pathlib import Path
+          ip = ipaddress.IPv4Address(
+              (Path(os.environ["RUNNER_TEMP"]) / "ssl-outbound-ip").read_text().strip())
+          if not ip.is_global:
+              raise SystemExit("No usable public IPv4; stop rather than broadening access.")
+          print(f"TEMPORARY runner rule: {ip}/32", flush=True)
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          summary.write_text(
+              f"## Waiting for narrowly scoped Render access\n\n"
+              f"Add only `{ip}/32` temporarily to the old database's external access rules. "
+              "Do not add an allow-all rule. Remove this rule immediately after this run, "
+              "including on failure or cancellation. Outbound routing may differ; "
+              "a timeout is not permission to widen access.\n\n"
+              "An encrypted artifact alone does not mean restore verification passed.\n")
+          PY
+      - name: Approved read-only export - waiting for your exact IP rule
+        env:
+          SSL_RENDER_APPROVAL: ${{ inputs.approval }}
+          SSL_RENDER_ARCHIVE_SOURCE: ${{ secrets.SSL_RENDER_ARCHIVE_SOURCE }}
+          SSL_RENDER_ARCHIVE_PASSPHRASE: ${{ secrets.SSL_RENDER_ARCHIVE_PASSPHRASE }}
+        run: python scripts/ssl_render_archive.py export "$RUNNER_TEMP/ssl-encrypted"
+      - name: Upload encrypted archive ONLY
+        id: archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ssl-render-encrypted-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ssl-encrypted/ssl-render-archive.tar.gpg
+            ${{ runner.temp }}/ssl-encrypted/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+      - name: Download the uploaded artifact into a new directory
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ssl-render-encrypted-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ssl-downloaded
+      - name: Decrypt downloaded copy and verify restore - LOCAL scratch only
+        env:
+          SSL_RENDER_ARCHIVE_PASSPHRASE: ${{ secrets.SSL_RENDER_ARCHIVE_PASSPHRASE }}
+        run: python scripts/ssl_render_archive.py verify "$RUNNER_TEMP/ssl-downloaded"
+      - name: Record successful scope and remind about private download
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+
+          ## PASS - encrypted artifact round-trip and local restore
+          Decryption, PostgreSQL restore, snapshot table fingerprints, large objects,
+          and sequence definitions matched. This is not a model, login, or deployment test.
+          Download the artifact to two private locations before its seven-day retention ends.
+          Confirm required historical predictions, results, users and ledger tables are present
+          through an approved private inspection. No row data is printed in public logs.
+          EOF
+      - name: Always remind about restoring network restrictions
+        if: always()
+        run: |
+          echo "REMOVE the temporary runner /32 from Render now, even if this run failed or was cancelled." \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "Never delete the source database. A failed verification is not a verified backup." \
+            >> "$GITHUB_STEP_SUMMARY"

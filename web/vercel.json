@@ -10,5 +10,10 @@
     "app/**/*": {
       "maxDuration": 30
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "ssl-old-render-backup-manual": false
+    }
   }
 }
